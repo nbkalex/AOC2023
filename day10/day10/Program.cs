@@ -1,6 +1,17 @@
 ﻿using System.Drawing;
 using System.Linq;
 
+Dictionary<char, (Point, Point)> pipeTypes = new Dictionary<char, (Point, Point)>()
+{
+  {'-', (new Point(1,0), new Point(-1,0)) },
+  {'|', (new Point(0,1), new Point(0,-1)) },
+  {'L', (new Point(0,-1), new Point(1, 0)) },
+  {'J', (new Point(0, -1), new Point(-1, 0)) },
+  {'7', (new Point(-1, 0), new Point(0,1)) },
+  {'F', (new Point(1, 0), new Point(0,1)) },
+  {'.', (new Point(10,10), new Point(10,10)) }
+};
+
 var lines = File.ReadAllLines("in.txt");
 
 var neighbors = new List<Point>()
@@ -13,140 +24,60 @@ for (int i = 0; i < lines.Length; i++)
   for (int j = 0; j < lines[i].Length; j++)
     pipesMap.Add(new Point(j, i), lines[i][j]);
 
-var visited = new Dictionary<Point, int>();
-var nextPoints = new Queue<Point>();
-nextPoints.Enqueue(pipesMap.First(pm => pm.Value == 'S').Key);
-visited.Add(nextPoints.Last(), 0);
-while (nextPoints.Any())
+var startPos = pipesMap.First(pm => pm.Value == 'S').Key;
+Point next = new Point();
+foreach(var n in neighbors)
 {
-  var current = nextPoints.Dequeue();
+  Point p = new Point(startPos.X + n.X, startPos.Y + n.Y);
+  var nDir1 = pipeTypes[pipesMap[p]].Item1;
+  var nDir2 = pipeTypes[pipesMap[p]].Item2;
 
-  foreach (var neighbor in neighbors)
+  if (new Point(nDir1.X + p.X, nDir1.Y + p.Y) == startPos
+   || new Point(nDir2.X + p.X, nDir2.Y + p.Y) == startPos)
   {
-    Point n = new Point(current.X + neighbor.X, current.Y + neighbor.Y);
-    if (pipesMap.ContainsKey(n)
-    && (!visited.ContainsKey(n) || visited[n] > visited[current] + 1)
-    && AreConnected((current, pipesMap[current]), (n, pipesMap[n])))
-    {
-      nextPoints.Enqueue(n);
-      if (visited.ContainsKey(n))
-        visited[n] = visited[current] + 1;
-      else
-        visited.Add(n, visited[current] + 1);
-    }
+    next = p; 
+    break;
   }
 }
 
-Console.WriteLine(visited.Values.Max());
-
-Dictionary<Point, bool> visitedTiles = new Dictionary<Point, bool>();
-
-var tocheck = pipesMap.Where(m => !visited.ContainsKey(m.Key) && m.Value != 'S');
-foreach (var tile in tocheck)
+List<Point> loop = new List<Point>() { startPos, next };
+var hash = loop.ToHashSet();
+while (true)
 {
-  if (visitedTiles.ContainsKey(tile.Key))
-    continue;
+  var val = pipesMap[next];
+  var dir = pipeTypes[val];
 
-  bool valid = true;
-  Queue<Point> toVisit = new Queue<Point>();
-  toVisit.Enqueue(tile.Key);
-  HashSet<Point> visitedTiles2 = new HashSet<Point>(){tile.Key };
-  while (toVisit.Count > 0)
-  {
-    var current = toVisit.Dequeue();
-    foreach (var neighbor in neighbors)
-    {
-      Point n = new Point(current.X + neighbor.X, current.Y + neighbor.Y);
-      if (!pipesMap.ContainsKey(n))
-      { 
-        valid = false;
-        continue;
-      }
+  Point next1 = new Point(next.X + dir.Item1.X, next.Y + dir.Item1.Y);
+  Point next2 = new Point(next.X + dir.Item2.X, next.Y + dir.Item2.Y);
 
-      if(visited.ContainsKey(n)) 
-        continue;
-
-      if (visitedTiles2.Contains(n))
-        continue;
-
-      if (pipesMap[n] == '.')
-      { 
-        toVisit.Enqueue(n);
-        visitedTiles2.Add(n);
-      }
-    }
+  if(!hash.Contains(next1))
+    next = next1;
+  else
+  { 
+    if(!hash.Contains(next2))
+      next = next2;
+    else
+      break;
   }
 
-  foreach (var tile2 in visitedTiles2)
-    if(!visitedTiles.ContainsKey(tile2))
-      visitedTiles.Add(tile2, valid);
-
+  loop.Add(next);
+  hash.Add(next);
 }
 
-//string toIgnore = "|-S";
-//var ignored = visited.Where(v => !toIgnore.Contains(pipesMap[v.Key]));
+var notLoop = pipesMap.Keys.Where(m => !hash.Contains(m));
 
-foreach (var vt in visitedTiles.Keys)
-{
-  if (!visitedTiles[vt])
-    continue;
+Console.WriteLine(loop.Count()/2);
 
-  int leftCount =  visited.Count(v =>vt.Y == v.Key.Y && vt.X > v.Key.X);
-  int rightCount = visited.Count(v =>vt.Y == v.Key.Y && vt.X < v.Key.X);
-  int topCount =   visited.Count(v =>vt.X == v.Key.X && vt.Y < v.Key.Y);
-  int botCount =   visited.Count(v =>vt.X == v.Key.X && vt.Y > v.Key.Y);
-  List<int> edges = new List<int>() { leftCount, rightCount, topCount, botCount };
-  if (edges.All(e => e % 2 == 0))
-    visitedTiles[vt] = false;
-}
+const int DISPLAY_OFFSET = 20;
 
-Console.WriteLine(visitedTiles.Count(vt => vt.Value));
-
-const int DISPLAY_OFFSET = 10;
-
-foreach(var m in pipesMap)
+foreach (var m in pipesMap)
 {
   Console.SetCursorPosition(DISPLAY_OFFSET + m.Key.X, DISPLAY_OFFSET + m.Key.Y);
-  char display = !visitedTiles.ContainsKey(m.Key) ? m.Value : visitedTiles[m.Key] ? 'I' : 'O';
+  char display = m.Value;
 
-   if(display == 'O')
-    Console.ForegroundColor = ConsoleColor.Red;
-  else if (display == 'I')
+  if (hash.Contains(m.Key))
     Console.ForegroundColor = ConsoleColor.Blue;
-
   Console.WriteLine(display);
 
   Console.ResetColor();
-}
-
-
-bool AreConnected((Point, char) p1, (Point, char) p2)
-{
-  Dictionary<char, (Point, Point)> pipeTypes = new Dictionary<char, (Point, Point)>()
-{
-  {'|', (new Point(0,1), new Point(0,-1)) },
-  {'-', (new Point(1,0), new Point(-1,0)) },
-  {'L', (new Point(0,-1), new Point(1, 0)) },
-  {'J', (new Point(0, -1), new Point(-1, 0)) },
-  {'7', (new Point(-1, 0), new Point(0,1)) },
-  {'F', (new Point(1, 0), new Point(0,1)) },
-  {'.', (new Point(), new Point()) }
-};
-
-  bool firstConnectsSecond = p1.Item2 == 'S';
-  if (!firstConnectsSecond)
-  {
-    Point p12c1 = new Point(p1.Item1.X + pipeTypes[p1.Item2].Item1.X,
-                           p1.Item1.Y + pipeTypes[p1.Item2].Item1.Y);
-    Point p12c2 = new Point(p1.Item1.X + pipeTypes[p1.Item2].Item2.X,
-                           p1.Item1.Y + pipeTypes[p1.Item2].Item2.Y);
-    firstConnectsSecond = p12c1 == p2.Item1 || p12c2 == p2.Item1;
-  }
-
-  Point p22c1 = new Point(p2.Item1.X + pipeTypes[p2.Item2].Item1.X,
-                         p2.Item1.Y + pipeTypes[p2.Item2].Item1.Y);
-  Point p22c2 = new Point(p2.Item1.X + pipeTypes[p2.Item2].Item2.X,
-                         p2.Item1.Y + pipeTypes[p2.Item2].Item2.Y);
-
-  return (p22c1 == p1.Item1 || p22c2 == p1.Item1) && firstConnectsSecond;
 }
