@@ -29,6 +29,9 @@ while (queue.Any())
 
   foreach (var direction in directions)
   {
+    if(countStrait < 4 && dir != direction)
+      continue;
+
     if (direction.X == -1 * dir.X && direction.Y == -1 * dir.Y)
       continue;
 
@@ -38,7 +41,8 @@ while (queue.Any())
 
     bool changeDir = direction != dir;
     int nextCountStrait = changeDir ? 1 : countStrait + 1;
-    if(nextCountStrait > 3)
+
+    if(nextCountStrait > 10)
       continue;
 
     int nextTotal = total + map[newPos];
@@ -54,7 +58,7 @@ while (queue.Any())
     else
       visited.Add(hash, nextTotal);
 
-    if(newPos == end && totalEnd > nextTotal)
+    if(newPos == end && totalEnd > nextTotal && nextCountStrait >= 4)
       totalEnd = nextTotal;
 
     queue.Enqueue((newPos, direction, nextCountStrait, nextTotal));
@@ -62,3 +66,4 @@ while (queue.Any())
 }
 
 Console.WriteLine(totalEnd);
+// 732 too low
