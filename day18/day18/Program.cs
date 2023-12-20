@@ -84,12 +84,12 @@ double PolygonArea(Point[] verices)
   int j = verices.Length - 1;
   for (int i = 0; i < verices.Length; i++)
   {
-    area += (verices[j].X + verices[i].X) * (verices[j].Y - verices[i].Y);
+    area += (long)(verices[j].X + verices[i].X) * (verices[j].Y - verices[i].Y) + Math.Abs(verices[j].X - verices[i].X) + Math.Abs(verices[j].Y - verices[i].Y);
     j = i;  // j is previous vertex to i
   }
 
   // Return absolute value
-  return Math.Abs(area / 2.0);
+  return Math.Abs(area / 2.0)+1;
 }
 
 // 952408144115
