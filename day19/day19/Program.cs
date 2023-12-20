@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Data;
+using System.Text;
 
 var input = File.ReadAllText("in.txt").Split("\r\n\r\n");
 
@@ -71,7 +72,7 @@ foreach (var part in parts)
   }
 }
 
-Queue<(string, Dictionary<string, int[]>)> toVisit = new Queue<(string, Dictionary<string, int[]>)>();
+Stack<(string, Dictionary<string, int[]>)> toVisit = new Stack<(string, Dictionary<string, int[]>)>();
 
 Dictionary<string, int[]> combinations = new Dictionary<string, int[]>()
 {
@@ -81,16 +82,21 @@ Dictionary<string, int[]> combinations = new Dictionary<string, int[]>()
   { "s", Enumerable.Range(1, 4000).ToArray() }
 };
 
-toVisit.Enqueue(("in", combinations));
+toVisit.Push(("in", combinations));
 List<int[][]> acctepted = new List<int[][]>();
 
 while (toVisit.Any())
 {
-  var current = toVisit.Dequeue();
+  var current = toVisit.Pop();
 
   if (current.Item1 == "A")
   {
     acctepted.Add(current.Item2.Values.ToArray());
+    Console.WriteLine("accepted");
+    foreach (var k in current.Item2.Keys)
+      Console.WriteLine($"\t{k}: [{current.Item2[k].Min()}, {current.Item2[k].Max()}]");
+    Console.WriteLine("\t= " + current.Item2.Values.Aggregate((long)1, (s, v) => s * v.Length));
+    Console.WriteLine();
     continue;
   }
 
@@ -99,24 +105,27 @@ while (toVisit.Any())
     continue;
   }
 
-  foreach (var rule in workflows[current.Item1].SkipLast(1))
+  for (int i = 0; i < workflows[current.Item1].Length; i++)
   {
+    var rule = workflows[current.Item1][i];
     var combN = current.Item2.ToDictionary(k => k.Key, k => k.Value);
 
-    var combNext = combN[rule.op1].Where(c => rule.condition(c)).ToArray();
-    combN[rule.op1] = combNext;
-    toVisit.Enqueue((rule.destination, combN));
-  }
+    if (rule.op1 != "")
+    {
+      var combNext = combN[rule.op1].Where(c => rule.condition(c)).ToArray();
+      combN[rule.op1] = combNext;
+    }
 
-  // last has no condition
-  var comb = current.Item2.ToDictionary(k => k.Key, k => k.Value);
-  foreach (var rule2 in workflows[current.Item1].SkipLast(1))
-  {
-    var combNext2 = comb[rule2.op1].Where(c => !rule2.condition(c)).ToArray();
-    comb[rule2.op1] = combNext2;
-  }
+    // invalidate
+    for (int i2 = 0; i2 < i; i2++)
+    {
+      var rule2 = workflows[current.Item1][i2];
+      var combNext2 = combN[rule2.op1].Where(c => !rule2.condition(c)).ToArray();
+      combN[rule2.op1] = combNext2;
+    }
 
-  toVisit.Enqueue((workflows[current.Item1].Last().destination, comb));
+    toVisit.Push((rule.destination, combN));
+  }
 }
 
 Console.WriteLine(count);
