@@ -29,8 +29,6 @@ var modules = lines.Select(l => l.Split(" -> ")).Select((t, Index) =>
 
 foreach (var module in modules)
 {
-  if (module.Value is FlipFlopModule)
-    Console.Write("%" + module.Key + " ");
   if (module.Value is ConjunctionModule)
     Console.Write("&" + module.Key + " ");
 }
@@ -40,10 +38,16 @@ Console.WriteLine();
 foreach (var module in modules.Values)
   module.Initialize(modules);
 
-const int TIMES = 1000;
+const int TIMES = 10000000;
 List<(BaseModule, (BaseModule, bool))> toVisit = new List<(BaseModule, (BaseModule, bool))>();
+
+Dictionary<string, int> connetionsHJ = new Dictionary<string, int>();
+bool stop = false;
 for (int i = 0; i < TIMES; i++)
 {
+  if(stop)
+    break;
+
   toVisit.Add((null, (broadcaster, false)));
   broadcaster.ReceiveSignal(null, false);
   while (toVisit.Any())
@@ -59,17 +63,55 @@ for (int i = 0; i < TIMES; i++)
         module.Item1.ReceiveSignal(module.Item2.Item1, module.Item2.Item2);
         module.Item1.Update();
         fromVisit.AddRange(module.Item1.SendSignal());
+
+        if(module.Item1.mName == "hj" && module.Item2.Item2)
+        {
+          if (!connetionsHJ.ContainsKey(module.Item2.Item1.mName))
+            connetionsHJ.Add(module.Item2.Item1.mName, i+1);
+
+          if(connetionsHJ.Count == 4)
+          { 
+            stop = true;
+            break;
+          }
+
+          Console.WriteLine(module.Item2.Item1.mName + " " +  i);
+        }
       }
       else
         fromVisit.AddRange(module.Item2.Item1.SendSignal());
-      
+
+      if (fromVisit.Any(fv => fv.Item1 == null && !fv.Item2.Item2))
+      {
+        Console.WriteLine(i);
+        return;
+      }
     }
 
     toVisit = fromVisit;
   }
 }
 
+int[] values = connetionsHJ.Values.ToArray();
+long prod = connetionsHJ.Values.Aggregate((long)1, (s, v) => s * v);
+long cmmdcVal =values[0];
+foreach(var v in values.Skip(1))
+  cmmdcVal = cmmdc(cmmdcVal, v);
+Console.WriteLine(prod/cmmdcVal);
+
 Console.WriteLine((BaseModule.LowPulseCount + TIMES) * BaseModule.HighPulseCount);
+
+long cmmdc(long a, long b)
+{
+  while (b != 0)
+  {
+    long r = a % b;
+    a = b;
+    b = r;
+  }
+
+  return a;
+}
 
 // Class definitions   ---------------------------------------------
 
@@ -99,7 +141,7 @@ class BaseModule
   public virtual void Initialize(Dictionary<string, BaseModule> modules)
   {
     foreach (var module in ConnectionsIds)
-      Connections.Add(modules.ContainsKey(module) ? modules[module] : new BaseModule(module, new List<string>()));
+      Connections.Add(modules.ContainsKey(module) ? modules[module] : new Out(module, new List<string>()));
 
   }
 
@@ -133,9 +175,9 @@ class BaseModule
       else
         LowPulseCount++;
 
-      string signalStr = GetOutSignal() ? "high" : "low";
-      if (module != null)
-        Console.WriteLine($"{mName} -{signalStr} -> {module.mName}");
+      //string signalStr = GetOutSignal() ? "high" : "low";
+      //if (module is ConjunctionModule)
+      //  Console.WriteLine($"{mName} -{signalStr} -> {module.mName}");
 
       sent.Add((module, (this, GetOutSignal())));
     }
@@ -219,6 +261,18 @@ class ConjunctionModule : BaseModule
     base.Update();
     mSignals = mTempSignals;
     mSignal = mSignals.Values.All(s => s) ? false : true;
+  }
+}
+
+class Out : BaseModule
+{
+  public Out(string name, List<string> modules) : base(name, modules)
+  {
+  }
+
+  public override void ReceiveSignal(BaseModule module, bool signal)
+  {
+    base.ReceiveSignal(module, signal);
   }
 }
 
